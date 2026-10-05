@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+sample_data/
+*.db-wal
+*.db-shm
