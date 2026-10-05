@@ -4,7 +4,7 @@
 
 | MSSV | Họ tên |
 | --- | --- |
-| <điền MSSV của bạn> | Phạm Quỳnh Hương |
+|CE201234 | Phạm Quỳnh Hương |
 
 Crawler BFS bằng Python (Requests, BeautifulSoup, SQLite). Ngoài việc lưu trang và liên kết theo đề bài, crawler trích thông tin phim từ **TV360** (`tv360.vn`) để làm dữ liệu cho đề tài tìm phim bằng mô tả cốt truyện. Phim không có phần nội dung bị loại ngay khi crawl.
 
