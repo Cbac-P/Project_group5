@@ -96,20 +96,25 @@ Trong thư mục `--output`:
 
 ## 9. Kết quả
 
-Lượt chạy thử 450 trang (`python main.py report` để xem số liệu của lượt chạy hiện tại):
+Lượt chạy 1.000 trang (`python main.py report` để xem lại số liệu từ database):
 
 | | |
 |---|---|
-| Trang đã crawl | 450, tất cả depth 0 (lấy từ sitemap) |
-| HTTP 200 / 404 | 212 / 238 |
-| URL phát hiện | 925 |
-| URL bị loại bởi bộ lọc | 231 |
-| Phim trích được (có nội dung) | 204 |
+| Trang đã crawl | 1.000, tất cả depth 0 (lấy từ sitemap) |
+| HTTP 200 | 386 |
+| HTTP 404 | 412 |
+| Không có phản hồi HTTP | 202 (lý do ghi ở cột `error` của bảng `pages`) |
+| Request lỗi (tổng) | 614 |
+| URL phát hiện | 1.595 |
+| URL bị loại bởi bộ lọc | 401 |
+| Phim trích được (có nội dung) | 378 |
+
+Trong 386 trang tải thành công, 378 trang cho ra phim có nội dung (khoảng 98%); các trang còn lại bị loại vì không có phần nội dung. Toàn bộ trang ở depth 0 vì phim được lấy trực tiếp từ sitemap và phần phim gợi ý trên trang không có trong HTML.
 
 ## 10. Hạn chế
 
 - Bình luận và mục phim gợi ý của TV360 được tải bằng JavaScript nên không có trong dữ liệu; `requests` chỉ tải HTML ban đầu.
-- Sitemap của TV360 còn liệt kê nhiều URL không còn truy cập được (HTTP 404), nên số phim thu được nhỏ hơn số trang đã crawl.
+- Sitemap của TV360 còn liệt kê nhiều URL không còn truy cập được: 412/1.000 trang trả về HTTP 404 và 202 trang không nhận được phản hồi, nên số phim thu được (378) nhỏ hơn nhiều so với số trang đã crawl.
 - Parser phụ thuộc vào cấu trúc trang hiện tại của TV360; trang đổi giao diện thì cần sửa `parser.py`.
 - Dữ liệu chỉ phản ánh phim có trên nền tảng TV360, nên có thể lệch so với toàn bộ phim thực tế.
 - Crawler tuân thủ robots.txt và `Crawl-delay`, chỉ lấy văn bản công khai, không đăng nhập và không tải video. Dữ liệu dùng cho mục đích học tập; điều khoản dịch vụ của TV360 có quy định về quyền sở hữu nội dung nên không công bố toàn văn mô tả.
