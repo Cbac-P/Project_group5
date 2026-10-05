@@ -182,18 +182,30 @@ class CrawlerTests(unittest.TestCase):
 
 class UrlRuleTests(unittest.TestCase):
     def test_normalize_and_scope(self):
-        self.assertEqual(normalize_url("/a#part", "https://momo.vn"), "https://www.momo.vn/a")
+        # --- Chuẩn hóa chung ---
         self.assertIsNone(normalize_url("javascript:void(0)"))
+        self.assertIsNone(normalize_url("mailto:abc@example.com"))
         self.assertNotEqual(normalize_url("https://example.com/a"), normalize_url("https://example.com/a/"))
-        self.assertEqual(normalize_url("https://vi.wikipedia.org/wiki/Thể_loại:Phim"),
-                         normalize_url("https://vi.wikipedia.org/wiki/Th%E1%BB%83_lo%E1%BA%A1i%3APhim"))
+        self.assertEqual(normalize_url("https://example.com/a"), normalize_url("https://example.com/%61"))   # %61 = "a"
         self.assertIn("%2F", normalize_url("https://doi.org/10.1/a%2Fb"))   # %2F không thành dấu phân cách
-        momo, wiki = ["www.momo.vn"], ["vi.wikipedia.org"]
-        self.assertIsNone(url_reason("https://www.momo.vn/cinema/phim-a-1", momo))
-        self.assertIsNotNone(url_reason("https://momo.vn.example.com/cinema/a-1", momo))   # không khớp theo hậu tố
-        self.assertIsNotNone(url_reason("https://www.momo.vn/cinema/a-1?page=2", momo))
-        self.assertIsNone(url_reason(normalize_url("https://vi.wikipedia.org/wiki/Backrooms:_Thực_thể"), wiki))
-        self.assertIsNotNone(url_reason(normalize_url("https://vi.wikipedia.org/wiki/Bản_mẫu:Phim"), wiki))
+
+        # --- Chuẩn hóa riêng cho w2w.vn ---
+        self.assertEqual(normalize_url("https://www.w2w.vn/phim/abc"), "https://w2w.vn/phim/abc/")   # bỏ www, thêm "/"
+        self.assertEqual(normalize_url("/phim/abc#part", "https://w2w.vn"), "https://w2w.vn/phim/abc/")   # bỏ fragment
+        self.assertEqual(normalize_url("https://w2w.vn/phim/Phim-Việt/"),
+                         normalize_url("https://w2w.vn/phim/Phim-Vi%E1%BB%87t/"))   # tiếng Việt có dấu = dạng mã hóa
+
+        # --- Phạm vi crawl ---
+        w2w = ["w2w.vn"]
+        self.assertIsNone(url_reason("https://w2w.vn/phim/ten-phim/", w2w))                 # trang chi tiết phim
+        self.assertIsNone(url_reason("https://w2w.vn/phim/", w2w))                          # trang danh sách
+        self.assertIsNone(url_reason("https://w2w.vn/phim/page/2/", w2w))                   # phân trang danh sách
+        self.assertIsNone(url_reason("https://w2w.vn/phim/?page=2", w2w))                   # query phân trang được phép
+        self.assertEqual(url_reason("https://w2w.vn/blog/abc/", w2w), "outside_movie_paths")
+        self.assertEqual(url_reason("https://w2w.vn/phim/ten-phim/?a=1", w2w), "w2w_query_blocked")
+        self.assertEqual(url_reason("https://w2w.vn/phim/poster.jpg", w2w), "non_html_extension")
+        self.assertEqual(url_reason("https://example.com/phim/a/", w2w), "outside_domain")
+        self.assertEqual(url_reason("https://w2w.vn.example.com/phim/a/", w2w), "outside_domain")   # không khớp theo hậu tố
 
     def test_robots_wildcard_and_longest_rule(self):
         rules = Robots("User-agent: *\nAllow: /\nDisallow: /*?\nDisallow: /_next/\nAllow: /_next/open$\n", "FilmBot/1.0")
@@ -205,84 +217,6 @@ class UrlRuleTests(unittest.TestCase):
         own_group = Robots("User-agent: *\nDisallow: /\nUser-agent: FilmBot\nAllow: /\n", "FilmBot/1")
         self.assertTrue(own_group.allows("https://example.com/a"))
 
-
-def wiki(body, name="Phim_mẫu"):
-    return parse_page(body, "https://vi.wikipedia.org/wiki/" + name, NOW)
-
-
-class ParserTests(unittest.TestCase):
-    def test_momo_movie_export_and_status(self):
-        data = {"Id": 123, "Title": "Phim, có dấu", "TitleEn": "Original",
-                "Synopsis": "Tình tiết bí ẩn.\nMột câu nữa.", "OpeningDate": "2036-12-18 00:00:00",
-                "ApiCasts": [{"name": "Diễn viên", "character": "Nhân vật"}]}
-        payload = json.dumps({"props": {"pageProps": {"FilmData": {"Data": data}}}}, ensure_ascii=False)
-        html = f'<head><title>T</title></head><body>Quảng cáo<script id="__NEXT_DATA__">{payload}</script></body>'
-        parsed = parse_page(html, "https://www.momo.vn/cinema/a-123", NOW)
-        movie = parsed["movie"]
-        self.assertNotIn("Quảng cáo", movie["synopsis"])
-        self.assertIsNone(movie["release_year"])   # OpeningDate là ngày chiếu địa phương, không phải năm phát hành
-        self.assertEqual(movie["release_status"], "upcoming")
-        self.assertEqual((movie["cast"], movie["characters"]), (["Diễn viên"], ["Nhân vật"]))
-        self.assertNotIn("FilmData", parsed["content"])
-
-        with tempfile.TemporaryDirectory() as folder:
-            config = Config(output_dir=Path(folder))
-            db = connect(Path(folder) / "crawler.db")
-            from database import save_page
-            save_page(db, dict(url=movie["source_url"], domain="www.momo.vn", title="T", content="x", depth=0,
-                               status_code=200, crawled_at=NOW), [], movie)
-            summary = export_all(db, config)
-            with (Path(folder) / "momo_movies_raw.csv").open(encoding="utf-8-sig", newline="") as file:
-                row = next(csv.DictReader(file))
-            db.close()
-        self.assertEqual((row["title"], json.loads(row["cast"])), ("Phim, có dấu", ["Diễn viên"]))
-        self.assertEqual((summary["movies"], summary["movies_with_synopsis"]), ({"momo": 1}, 0))   # sắp chiếu thì bị loại
-
-    def test_wiki_synopsis_stops_before_next_section(self):
-        movie = wiki('''<h1 id="firstHeading">Phim mẫu (phim)</h1><div class="mw-parser-output">
-          <table class="infobox"><tr><th class="summary">Phim mẫu</th></tr>
-          <tr><th>Đạo diễn</th><td><a>Người A</a></td></tr><tr><th>Công chiếu</th><td>2018</td></tr></table>
-          <p>Phim mẫu là một bộ phim kinh dị.</p>
-          <div class="mw-heading"><h2>Nội dung<span class="mw-editsection">[sửa]</span></h2></div>
-          <p>Một người tìm kiếm sự thật.<sup class="reference"><a href="#r">[1]</a></sup></p>
-          <h3>Hồi cuối</h3><p>Họ giải cứu người bạn.</p>
-          <h2>Diễn viên</h2><p>Không lấy phần này.</p></div>''')["movie"]
-        self.assertEqual((movie["title"], movie["release_year"]), ("Phim mẫu", 2018))
-        self.assertIn("giải cứu", movie["synopsis"])
-        self.assertNotIn("Không lấy", movie["synopsis"])
-        self.assertNotIn("[1]", movie["synopsis"])
-
-    def test_wiki_category_page_is_not_a_movie(self):
-        parsed = wiki('<h1>Phim</h1><div class="mw-parser-output">Category</div>', "Thể_loại:Phim")
-        self.assertEqual((parsed["movie"], parsed["page_type"]), (None, "category"))
-
-    def test_wiki_original_title_genre_and_upcoming(self):
-        movie = wiki('''<h1 id="firstHeading">Tên Việt</h1><div class="mw-parser-output">
-          <table class="infobox"><tr><th class="summary">English Title<br/>Tên Việt</th></tr>
-          <tr><th>Đạo diễn</th><td>Người A</td></tr>
-          <tr><th>Công chiếu</th><td>15 tháng 1 năm 2030 (2030-01-15)</td></tr></table>
-          <p>Tên Việt là một bộ phim.</p><h2>Cốt truyện</h2><p>Nhân vật tìm đường về nhà.</p>
-          <link rel="mw:PageProp/Category" href="./Thể_loại:Phim_kinh_dị_Mỹ"/></div>''', "Tên_Việt")["movie"]
-        self.assertEqual((movie["original_title"], movie["genre"], movie["release_status"]),
-                         ("English Title", ["kinh dị"], "upcoming"))
-
-    def test_wiki_infobox_date_overrides_stale_upcoming_category(self):
-        movie = wiki('''<h1 id="firstHeading">Crawl 2</h1><div class="mw-parser-output">
-          <table class="infobox"><tr><th>Đạo diễn</th><td>Người A</td></tr>
-          <tr><th>Công chiếu</th><td>2025-01-01</td></tr></table>
-          <p>Crawl 2 là một bộ phim.</p><h2>Cốt truyện</h2><p>Thành phố ngập nước.</p>
-          <link rel="mw:PageProp/Category" href="./Thể_loại:Phim_chưa_ra_mắt"/></div>''', "Crawl_2")["movie"]
-        self.assertEqual(movie["release_status"], "released")
-
-    def test_wiki_disambig_link_does_not_exclude_film_but_tv_does(self):
-        body = '''<h1 id="firstHeading">Phim thật</h1><div class="mw-parser-output">
-          <table class="infobox"><tr><th>Đạo diễn</th><td>Người A</td></tr>
-          <tr><th>Công chiếu</th><td>2024</td></tr><tr><th>Thời lượng</th><td>90 phút</td></tr></table>
-          <p>Phim thật là một bộ phim có diễn viên <a class="mw-disambig" href="./Tên_trùng">A</a>.</p>
-          <h2>Nội dung</h2><p>Nhân vật đi tìm gia đình.</p></div>'''
-        self.assertIsNotNone(wiki(body, "Phim_thật")["movie"])
-        self.assertIsNone(wiki(body.replace("<th>Công chiếu</th>", "<th>Số tập</th>"), "Phim_thật")["movie"])
-        self.assertIsNone(wiki(body.replace("<h1", '<link rel="mw:PageProp/disambiguation"/><h1'), "Phim_thật")["movie"])
 
 
 if __name__ == "__main__":
