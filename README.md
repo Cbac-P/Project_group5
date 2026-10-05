@@ -14,7 +14,7 @@ Mã nguồn vẫn giữ bộ đọc cho MoMo và Wikipedia tiếng Việt, nhưn
 
 1. https://tv360.vn/movies
 
-Ngoài seed, danh sách phim được lấy từ sitemap https://tv360.vn/sitemap.xml (tối đa `sitemap_limit` URL, mỗi phim chỉ lấy một URL). Lý do: phần phim gợi ý trên trang TV360 được tải bằng JavaScript nên không có trong HTML, đi theo liên kết gần như không tìm thêm được phim.
+Ngoài seed, danh sách phim được lấy từ sitemap https://tv360.vn/sitemap.xml (tối đa `sitemap_limit` URL, mỗi phim chỉ lấy một URL). Các URL lấy từ sitemap được coi là **seed bổ sung** nên cũng ở depth 0; vì vậy bảng thống kê ghi `Seed URLs: 1` (seed khai báo trong `config.py`) nhưng có 1.000 trang ở depth 0. Lý do: phần phim gợi ý trên trang TV360 được tải bằng JavaScript nên không có trong HTML, đi theo liên kết gần như không tìm thêm được phim.
 
 ## 3. Cấu hình (`config.py`)
 
@@ -109,7 +109,7 @@ Lượt chạy 1.000 trang (`python main.py report` để xem lại số liệu 
 | URL bị loại bởi bộ lọc | 401 |
 | Phim trích được (có nội dung) | 378 |
 
-Trong 386 trang tải thành công, 378 trang cho ra phim có nội dung (khoảng 98%); các trang còn lại bị loại vì không có phần nội dung. Toàn bộ trang ở depth 0 vì phim được lấy trực tiếp từ sitemap và phần phim gợi ý trên trang không có trong HTML.
+Trong 386 trang tải thành công, 378 trang cho ra phim có nội dung (khoảng 98%); các trang còn lại bị loại vì không có phần nội dung. Toàn bộ trang ở depth 0 vì URL phim được nạp từ sitemap (seed bổ sung) với số lượng (khoảng 1.500) lớn hơn ngân sách 1.000 trang. Hàng đợi là FIFO nên crawler phải cào hết depth 0 rồi mới sang depth 1, và đã dừng trước khi tới lượt. Các liên kết tìm thấy trên trang (khoảng 90 URL mới, thể hiện ở số URL phát hiện 1.595 so với 1.501 URL ban đầu) được xếp ở depth 1 nhưng chưa được cào. Ngoài ra, phần phim gợi ý trên trang TV360 tải bằng JavaScript nên mỗi trang phim dẫn tới rất ít URL mới. Khi sitemap có ít URL hơn ngân sách (lượt chạy 200 trang với `sitemap_limit = 100`), crawler đã đi tiếp sang depth 1 và depth 2.
 
 ## 10. Hạn chế
 
