@@ -1,0 +1,30 @@
+{
+  "topic": "Movies & Entertainment",
+  "seed_urls": 900,
+  "pages_crawled": 900,
+  "unique_urls_discovered": 1019,
+  "skipped_urls": 119,
+  "failed_requests": 0,
+  "max_depth": 0,
+  "by_depth": {
+    "0": 900
+  },
+  "by_status_code": {
+    "200": 900
+  },
+  "by_crawl_status": {
+    "ok": 900
+  },
+  "by_domain": {
+    "w2w.vn": 900
+  },
+  "skip_reasons": {
+    "max_depth": 5882,
+    "outside_domain": 9000,
+    "outside_movie_paths": 14911
+  },
+  "movies": {
+    "w2w": 900
+  },
+  "movies_with_synopsis": 404
+}
